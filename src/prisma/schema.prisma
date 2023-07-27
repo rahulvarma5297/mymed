@@ -1,0 +1,189 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id                Int                 @id @default(autoincrement())
+  uuid              String?             @unique @default(cuid()) @db.VarChar(36)
+  email             String?             @unique @db.VarChar(128)
+  phone             String?             @unique @db.VarChar(20)
+  firstName         String?             @db.VarChar(128)
+  lastName          String?             @db.VarChar(128)
+  height            Decimal?            @db.Decimal(5, 2)
+  gender            Gender              @default(U)
+  createdAt         DateTime            @default(now())
+  MedicalHistory    MedicalHistory[]
+  UserMedicalDevice UserMedicalDevice[]
+  MedicalData       MedicalData[]
+  refreshToken      RefreshToken[]
+  AuthMode          AuthMode[]
+  Vaccination       Vaccination[]
+  Documents         Documents[]
+}
+
+model AuthMode {
+  id         Int      @id @unique @default(autoincrement())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId     Int
+  type       AuthType
+  identifier String   @db.VarChar(128)
+  validated  Boolean  @default(false)
+  createdAt  DateTime @default(now())
+}
+
+model otp {
+  id         String   @id @unique @default(uuid()) @db.VarChar(36)
+  type       AuthType @default(EMAIL)
+  otp        String   @db.VarChar(6)
+  identifier String   @db.VarChar(128)
+  validated  Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  @@map("OTP")
+}
+
+model RefreshToken {
+  id        String   @id @unique @default(uuid()) @db.VarChar(36)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    Int
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+}
+
+model Disease {
+  id             Int              @id @unique @default(autoincrement())
+  name           String           @db.VarChar(128)
+  createdAt      DateTime         @default(now())
+  MedicalHistory MedicalHistory[]
+}
+
+model MedicalHistory {
+  id        Int      @id @unique @default(autoincrement())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  disease   Disease  @relation(fields: [diseaseId], references: [id])
+  relation  Relation @default(self)
+  userId    Int
+  diseaseId Int
+}
+
+//Model for storing Medical Device model, company, name and description
+model MedicalDevice {
+  id                Int                 @id @unique @default(autoincrement())
+  name              String              @db.VarChar(128)
+  model             String              @db.VarChar(128)
+  company           String              @db.VarChar(128)
+  description       String              @db.VarChar(128)
+  createdAt         DateTime            @default(now())
+  UserMedicalDevice UserMedicalDevice[]
+  MedicalData       MedicalData[]
+}
+
+//Model for linking Medical Device to User
+model UserMedicalDevice {
+  id       Int           @id @unique @default(autoincrement())
+  user     User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  device   MedicalDevice @relation(fields: [deviceId], references: [id])
+  userId   Int
+  deviceId Int
+
+  @@unique([userId, deviceId], name: "user_device")
+}
+
+//Model for storing Medical Device data for a specific user with date and time
+model MedicalData {
+  id       Int               @id @unique @default(autoincrement())
+  user     User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  source   MedicalDataSource @default(DEVICE)
+  device   MedicalDevice?    @relation(fields: [deviceId], references: [id])
+  name     String            @db.VarChar(128)
+  value    Float             @db.Float
+  date     DateTime
+  userId   Int
+  deviceId Int?
+  batchId  String?           @default(uuid()) @db.VarChar(36)
+  units    HealthParamUnits? @relation(fields: [unitsId], references: [id])
+  unitsId  Int
+  created  DateTime          @default(now())
+
+  @@unique([userId, id], name: "user_id")
+  @@index([userId, name, date], name: "user_name_date")
+}
+
+model HealthParamUnits {
+  id          Int                 @id @unique @default(autoincrement())
+  nameSV      String              @unique @db.VarChar(128)
+  nameEN      String              @unique @db.VarChar(128)
+  unit        String              @db.VarChar(128)
+  createdAt   DateTime            @default(now())
+  MedicalData MedicalData[]
+  ranges      HealthParamRanges[]
+}
+
+model HealthParamRanges {
+  id          Int              @id @unique @default(autoincrement())
+  min         Float            @db.Float
+  max         Float            @db.Float
+  description String?          @db.VarChar(128)
+  color       String           @db.VarChar(8)
+  units       HealthParamUnits @relation(fields: [unitsId], references: [id])
+  unitsId     Int
+  createdAt   DateTime         @default(now())
+}
+
+model Vaccination {
+  id        Int      @id @unique @default(autoincrement())
+  name      String   @db.VarChar(128)
+  date      DateTime @default(now())
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@index([id, userId, date], name: "id_userId")
+  @@index([userId, name, date], name: "user_name_date")
+}
+
+model Documents {
+  id        Int      @id @unique @default(autoincrement())
+  name      String   @default("") @db.VarChar(128)
+  tag       String   @db.VarChar(128)
+  date      DateTime @default(now())
+  path      String   @db.VarChar(256)
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([id, userId], name: "id_userId")
+  @@index([userId, tag, date], name: "user_name_date")
+  @@index([userId, path], name: "user_path")
+}
+
+enum AuthType {
+  EMAIL
+  PHONE
+  BANKID
+}
+
+enum Relation {
+  self
+  family
+}
+
+enum MedicalDataSource {
+  DEVICE
+  MANUAL
+}
+
+enum Gender {
+  M
+  F
+  O
+  U
+}

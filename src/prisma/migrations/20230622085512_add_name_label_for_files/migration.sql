@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE `Documents` ADD COLUMN `name` VARCHAR(128) NOT NULL DEFAULT '';
